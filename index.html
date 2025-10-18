@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Native Voice Data Collector</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for aesthetic buttons and card */
+        .card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-record {
+            background-color: #ef4444; /* Red 500 */
+            transition: background-color 0.3s ease;
+        }
+        .btn-record:hover:not(:disabled) {
+            background-color: #dc2626; /* Red 600 */
+        }
+        .btn-stop {
+            background-color: #3b82f6; /* Blue 500 */
+        }
+        .btn-stop:hover:not(:disabled) {
+            background-color: #2563eb; /* Blue 600 */
+        }
+        .btn-play {
+            background-color: #10b981; /* Emerald 500 */
+        }
+        .btn-play:hover {
+            background-color: #059669; /* Emerald 600 */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 flex flex-col items-center p-4 font-sans">
+
+    <!-- Main Application Card -->
+    <div class="card w-full max-w-4xl bg-white p-6 md:p-10 rounded-xl mt-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Native Voice Collector</h1>
+            <p class="text-gray-600">Contribute your voice in your native language and get paid for approved recordings.</p>
+        </header>
+
+        <!-- User Info and Language Input -->
+        <div class="mb-8 p-4 bg-indigo-50 rounded-lg border-l-4 border-indigo-500">
+            <p class="text-sm font-medium text-indigo-700 mb-2">
+                User ID: <span id="user-id" class="font-mono text-xs bg-indigo-200 px-2 py-1 rounded">Loading...</span>
+            </p>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <label for="native-language" class="text-sm font-medium text-gray-700 whitespace-nowrap">Your Native Language:</label>
+                <input type="text" id="native-language" value="Klingon" placeholder="e.g., Spanish, Hindi, Yoruba"
+                       class="flex-grow p-2 border border-indigo-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+            </div>
+        </div>
+        
+        <!-- Recording Prompt and Controls -->
+        <section id="recording-controls" class="border border-dashed border-gray-300 p-6 rounded-lg mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Current Task: Read a Short Sentence</h2>
+            
+            <p id="current-prompt" class="p-3 bg-white border border-gray-200 rounded-lg text-lg italic text-gray-700 mb-4 select-none">
+                "Hello, I am recording this sentence to help train a natural language model."
+            </p>
+
+            <div id="status-message" class="text-center font-medium text-sm text-gray-500 mb-4">
+                Ready to record. Click START when you are ready.
+            </div>
+
+            <div class="flex justify-center space-x-4">
+                <button id="start-btn" class="btn-record text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl disabled:opacity-50 transition duration-150 ease-in-out">
+                    Start Recording
+                </button>
+                <button id="stop-btn" class="btn-stop text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl disabled:opacity-50 transition duration-150 ease-in-out" disabled>
+                    Stop Recording
+                </button>
+            </div>
+            <div id="countdown" class="text-center mt-3 text-red-600 font-extrabold text-xl hidden"></div>
+        </section>
+
+        <!-- Recordings History -->
+        <section id="history">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Your Past Recordings</h2>
+            <div id="recordings-list" class="space-y-3">
+                <p id="loading-indicator" class="text-center text-gray-500">Loading your history...</p>
+                <!-- Recordings will be injected here -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Firebase SDK Imports (MUST be type="module") -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+        // --- GLOBAL SETUP & FIREBASE INITIALIZATION ---
+
+        // Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth, storage, userId = null;
+
+        // Recording state
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let mediaStream = null;
+        let isRecording = false;
+
+        // DOM elements
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusMessage = document.getElementById('status-message');
+        const recordingsList = document.getElementById('recordings-list');
+        const userIdDisplay = document.getElementById('user-id');
+        const languageInput = document.getElementById('native-language');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const countdownDisplay = document.getElementById('countdown');
+
+        /**
+         * Initializes Firebase and authenticates the user.
+         */
+        async function initializeFirebase() {
+            try {
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase config is missing or empty.");
+                    statusMessage.textContent = "Error: Firebase configuration is missing.";
+                    return;
+                }
+                
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                storage = getStorage(app);
+
+                // Authenticate
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Set up auth state listener
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        console.log("User authenticated:", userId);
+                        // Once authenticated, start loading data
+                        loadRecordings(userId);
+                    } else {
+                        userId = null;
+                        userIdDisplay.textContent = "Not Signed In";
+                        console.log("User signed out.");
+                        loadingIndicator.textContent = "Please refresh to sign in.";
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                statusMessage.textContent = `Authentication Error: ${error.message}`;
+            }
+        }
+
+        // --- RECORDING FUNCTIONS ---
+
+        /**
+         * Starts the audio recording process.
+         */
+        async function startRecording() {
+            if (isRecording || !userId) return;
+
+            // 1. Check for language input
+            const language = languageInput.value.trim();
+            if (!language) {
+                showToast("Please enter your native language before recording.", 'text-red-500');
+                return;
+            }
+
+            // 2. Request microphone permission
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = saveRecording;
+
+                // 3. Start recording
+                mediaRecorder.start();
+                isRecording = true;
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                languageInput.disabled = true;
+                statusMessage.textContent = "Recording... Say the prompt clearly in your native language.";
+
+                // 4. Start 5-second timer for prompt length simulation
+                startTimer(5);
+
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                showToast(`Failed to access microphone: ${err.message}. Please check permissions.`, 'text-red-500');
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                isRecording = false;
+            }
+        }
+
+        /**
+         * Stops the audio recording process.
+         */
+        function stopRecording() {
+            if (!isRecording || !mediaRecorder) return;
+
+            mediaRecorder.stop();
+            mediaStream.getTracks().forEach(track => track.stop()); // Stop the stream tracks
+            isRecording = false;
+            
+            startBtn.disabled = true; // Wait for saving process to finish
+            stopBtn.disabled = true;
+            countdownDisplay.classList.add('hidden');
+            statusMessage.textContent = "Recording stopped. Uploading and processing...";
+        }
+
+        /**
+         * Saves the recorded Blob to Firebase Storage and metadata to Firestore.
+         */
+        async function saveRecording() {
+            if (audioChunks.length === 0 || !userId) {
+                showToast("No audio data recorded.", 'text-red-500');
+                resetControls();
+                return;
+            }
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const filename = `${Date.now()}-${userId}.webm`;
+            
+            // 1. Firebase Storage Path
+            const storagePath = `recordings/${userId}/${filename}`;
+            const audioRef = ref(storage, storagePath);
+
+            // 2. Firestore Document Path
+            const recordingsColRef = collection(db, `artifacts/${appId}/users/${userId}/recordings`);
+            const newDocRef = doc(recordingsColRef);
+            
+            const language = languageInput.value.trim() || 'Unknown';
+
+            try {
+                // Upload file to Storage
+                const uploadResult = await uploadBytes(audioRef, audioBlob);
+                const fileUrl = await getDownloadURL(uploadResult.ref);
+
+                // Save metadata to Firestore
+                const recordingData = {
+                    fileId: newDocRef.id,
+                    storagePath: storagePath,
+                    url: fileUrl,
+                    language: language,
+                    status: 'Pending Review', // Initial status
+                    prompt: document.getElementById('current-prompt').textContent.trim(),
+                    recordedAt: serverTimestamp(),
+                    userId: userId,
+                };
+
+                await setDoc(newDocRef, recordingData);
+
+                showToast("Recording successfully uploaded and submitted for review!", 'text-green-500');
+
+            } catch (error) {
+                console.error("Error saving recording:", error);
+                showToast(`Failed to save recording: ${error.message}`, 'text-red-500');
+            } finally {
+                resetControls();
+            }
+        }
+
+        /**
+         * Resets control buttons to the ready state.
+         */
+        function resetControls() {
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            languageInput.disabled = false;
+            isRecording = false;
+            statusMessage.textContent = "Ready to record. Click START when you are ready.";
+            countdownDisplay.classList.add('hidden');
+        }
+
+        // --- DATA DISPLAY & REAL-TIME LISTENER ---
+
+        /**
+         * Sets up a real-time listener for the user's recordings.
+         * @param {string} currentUserId The authenticated user's ID.
+         */
+        function loadRecordings(currentUserId) {
+            if (!db) return;
+
+            const collectionPath = `artifacts/${appId}/users/${currentUserId}/recordings`;
+            const q = query(collection(db, collectionPath));
+            
+            loadingIndicator.classList.remove('hidden');
+            recordingsList.innerHTML = ''; // Clear existing list
+
+            onSnapshot(q, (snapshot) => {
+                loadingIndicator.classList.add('hidden');
+                
+                if (snapshot.empty) {
+                    recordingsList.innerHTML = '<p class="text-gray-500 text-center p-4 bg-gray-100 rounded-md">No recordings submitted yet. Start your first!</p>';
+                    return;
+                }
+
+                const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort by recordedAt descending
+                docs.sort((a, b) => (b.recordedAt?.toDate() || 0) - (a.recordedAt?.toDate() || 0));
+
+                renderRecordingsList(docs);
+            }, (error) => {
+                console.error("Error listening to recordings:", error);
+                recordingsList.innerHTML = `<p class="text-red-500 text-center p-4 bg-red-50 rounded-md">Error loading recordings: ${error.message}</p>`;
+            });
+        }
+
+        /**
+         * Renders the list of recordings based on Firestore data.
+         * @param {Array<Object>} recordings Array of recording documents.
+         */
+        function renderRecordingsList(recordings) {
+            recordingsList.innerHTML = ''; // Clear
+            recordings.forEach(rec => {
+                const date = rec.recordedAt ? new Date(rec.recordedAt.seconds * 1000).toLocaleString() : 'Saving...';
+                
+                let statusClass = '';
+                if (rec.status === 'Approved') {
+                    statusClass = 'bg-green-100 text-green-800';
+                } else if (rec.status === 'Rejected') {
+                    statusClass = 'bg-red-100 text-red-800';
+                } else {
+                    statusClass = 'bg-yellow-100 text-yellow-800 animate-pulse';
+                }
+
+                const itemHtml = `
+                    <div class="p-4 bg-white rounded-lg border flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div class="flex-grow mb-3 md:mb-0">
+                            <div class="text-xs font-semibold uppercase text-gray-500">${rec.language} Recording</div>
+                            <div class="text-sm text-gray-800 truncate">Prompt: "${rec.prompt.substring(0, 50)}..."</div>
+                            <div class="text-xs text-gray-400 mt-1">Submitted: ${date}</div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-3 py-1 text-xs font-medium rounded-full ${statusClass}">
+                                ${rec.status}
+                            </span>
+                            ${rec.url ? `<button data-url="${rec.url}" class="btn-play text-white py-2 px-4 rounded-full text-sm font-medium shadow-md">
+                                Play
+                            </button>` : `<span class="text-sm text-gray-400">Audio Unavailable</span>`}
+                        </div>
+                    </div>
+                `;
+                recordingsList.insertAdjacentHTML('beforeend', itemHtml);
+            });
+
+            // Re-attach event listeners to play buttons
+            recordingsList.querySelectorAll('.btn-play').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const url = e.currentTarget.dataset.url;
+                    if (url) {
+                        const audio = new Audio(url);
+                        audio.play().catch(err => console.error("Audio playback failed:", err));
+                        showToast("Playing recorded audio...", 'text-blue-500');
+                    }
+                });
+            });
+        }
+
+        // --- UTILITY FUNCTIONS ---
+
+        /**
+         * Creates a simple, ephemeral notification message.
+         * @param {string} message The message to display.
+         * @param {string} colorClass Tailwind color class for text (e.g., 'text-green-500').
+         */
+        function showToast(message, colorClass = 'text-gray-700') {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.className = `fixed bottom-5 left-1/2 transform -translate-x-1/2 p-3 bg-white ${colorClass} rounded-lg shadow-xl z-50 transition-opacity duration-300`;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        /**
+         * Starts a simple countdown timer display.
+         * @param {number} seconds The duration of the countdown.
+         */
+        function startTimer(seconds) {
+            let count = seconds;
+            countdownDisplay.textContent = `Time remaining: ${count}s`;
+            countdownDisplay.classList.remove('hidden');
+
+            const timer = setInterval(() => {
+                count--;
+                countdownDisplay.textContent = `Time remaining: ${count}s`;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    // The user is not forced to stop, but the timer provides guidance
+                }
+                // Stop recording after 10 seconds automatically if user forgets
+                if(count === seconds - 10) {
+                     if(isRecording) {
+                        stopRecording();
+                        showToast("Recording time limit reached. Auto-stopping.", 'text-yellow-600');
+                     }
+                }
+            }, 1000);
+        }
+        
+        // --- EVENT LISTENERS & MAIN CALL ---
+
+        startBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+        
+        // Initialize the application when the window loads
+        window.onload = initializeFirebase;
+
+    </script>
+</body>
+</html>
