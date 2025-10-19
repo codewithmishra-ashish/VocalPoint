@@ -14,6 +14,8 @@ import Dashboard from "./pages/Dashboard";
 import VoiceRecord from "./pages/VoiceRecord";
 import AddTask from "./pages/AddTask";
 import AdminPanel from "./pages/AdminPanel";
+import RecordPage from "./pages/RecordPage";
+
 
 // Protected Route Wrapper
 const PrivateRoute = ({ children }) => {
@@ -42,7 +44,7 @@ function App() {
           }
         />
         <Route
-          path="/record"
+          path="/record1"
           element={
             <PrivateRoute>
               <VoiceRecord />
@@ -64,6 +66,12 @@ function App() {
               <AdminPanel />
             </PrivateRoute>
           }
+        />
+        <Route 
+          path="/record" 
+          element={
+            <RecordPage />
+          } 
         />
 
         {/* Catch-all */}
