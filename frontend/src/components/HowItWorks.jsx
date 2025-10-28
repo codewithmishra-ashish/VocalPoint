@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, CheckCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const Step = ({ num, title, desc, isLast }) => (
   <div className="flex flex-col items-center text-center max-w-xs">

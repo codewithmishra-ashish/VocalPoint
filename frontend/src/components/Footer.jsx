@@ -1,61 +1,151 @@
-import React from "react";
-import { Github, Twitter, Globe } from "lucide-react";
+import React, { useState } from "react";
+import { Github, Twitter, Globe, ChevronUp, ChevronDown} from "lucide-react";
+import Logo from "./Logo";
 
 const Footer = () => {
+  const [openSection, setOpenSection] = useState(null);
+
+  const toggle = (section) => {
+    setOpenSection(openSection === section ? null : section);
+  };
+
+  const links = {
+    explore: [
+      { name: "Features", href: "#features" },
+      { name: "How It Works", href: "#how" },
+      { name: "Pricing", href: "#pricing" },
+      { name: "Demo", href: "#demo" },
+    ],
+    company: [
+      { name: "About", href: "/about" },
+      { name: "Blog", href: "/blog" },
+      { name: "Careers", href: "/careers" },
+      { name: "Contact", href: "/contact" },
+    ],
+    legal: [
+      { name: "Privacy", href: "/privacy" },
+      { name: "Terms", href: "/terms" },
+      { name: "Cookies", href: "/cookies" },
+    ],
+  };
+
   return (
-    <footer className="bg-indigo-950 border-t border-gray-800 py-12">
-      <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-3 gap-8 text-center md:text-left">
-        {/* Brand */}
-        <div>
-          <div className="flex items-center justify-center md:justify-start space-x-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
-              <span className="text-white font-black text-sm">V</span>
+    <footer className="relative bg-gradient-to-t from-indigo-950/50 via-gray-950 to-gray-950 border-t border-gray-800">
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        {/* Mobile */}
+        <div className="md:hidden space-y-4">
+          {Object.entries(links).map(([section, items]) => (
+            <div key={section} className="border-b border-gray-800 pb-4">
+              <button
+                onClick={() => toggle(section)}
+                className="w-full flex justify-between items-center text-left py-3"
+                aria-expanded={openSection === section}
+                aria-controls={`${section}-links`}
+              >
+                <span className="text-white font-semibold capitalize">{section}</span>
+                {openSection === section ? (
+                  <ChevronUp size={20} className="text-gray-400" />
+                ) : (
+                  <ChevronDown size={20} className="text-gray-400" />
+                )}
+              </button>
+              {openSection === section && (
+                <ul id={`${section}-links`} className="mt-2 space-y-2 pl-2">
+                  {items.map((item) => (
+                    <li key={item.name}>
+                      <a
+                        href={item.href}
+                        className="text-gray-400 hover:text-blue-400 text-sm transition block"
+                        onClick={(e) => {
+                          if (item.href.startsWith("#")) {
+                            e.preventDefault();
+                            document.querySelector(item.href)?.scrollIntoView({ behavior: "smooth" });
+                          }
+                        }}
+                      >
+                        {item.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <span className="text-xl font-bold text-white">VocalPoint</span>
-          </div>
-          <p className="mt-2 text-gray-400 text-sm">
-            Empowering multilingual AI through human voices.
-          </p>
+          ))}
         </div>
 
-        {/* Links */}
-        <div className="flex flex-col items-center md:items-start space-y-2">
-          <a href="#features" className="text-gray-300 hover:text-blue-400 transition">
-            Features
-          </a>
-          <a href="#how" className="text-gray-300 hover:text-blue-400 transition">
-            How It Works
-          </a>
-          <a href="/privacy" className="text-gray-300 hover:text-blue-400 transition">
-            Privacy
-          </a>
+        {/* Desktop */}
+{/* Desktop */}
+        <div className="hidden md:grid md:grid-cols-4 gap-8 text-left">
+          <div>
+            <div className="flex items-center space-x-2 mb-4">
+              <Logo size="md" />
+              <span className="text-xl font-bold text-white">VocalPoint</span>
+            </div>
+            <p className="text-gray-400 text-sm">
+              The global voice data marketplace. Earn or scale with AI.
+            </p>
+          </div>
+
+          {Object.entries(links).map(([key, items]) => (
+            <div key={key}>
+              <h3 className="text-white font-semibold mb-3 capitalize">{key}</h3>
+              <ul className="space-y-2">
+                {items.map((item) => (
+                  <li key={item.name}>
+                    <a
+                      href={item.href}
+                      className="text-gray-400 hover:text-blue-400 text-sm transition block"
+                      onClick={(e) => {
+                        if (item.href.startsWith("#")) {
+                          e.preventDefault();
+                          document.querySelector(item.href)?.scrollIntoView({ behavior: "smooth" });
+                        }
+                      }}
+                    >
+                      {item.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
         {/* Social */}
-        <div className="flex justify-center md:justify-end space-x-4">
-          <a
-            href="#"
-            className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition"
-          >
-            <Twitter size={20} />
-          </a>
-          <a
-            href="#"
-            className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition"
-          >
-            <Github size={20} />
-          </a>
-          <a
-            href="#"
-            className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition"
-          >
-            <Globe size={20} />
-          </a>
+        <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-gray-500 text-sm">
+            © {new Date().getFullYear()} VocalPoint. All voices matter.
+          </p>
+          <div className="flex space-x-4">
+            <a
+              href="https://twitter.com/vocalpoint"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-sky-400 transition-all hover:scale-110"
+              aria-label="Twitter"
+            >
+              <Twitter size={18} />
+            </a>
+            <a
+              href="https://github.com/vocalpoint"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-gray-300 transition-all hover:scale-110"
+              aria-label="GitHub"
+            >
+              <Github size={18} />
+            </a>
+            <a
+              href="https://vocalpoint.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-green-400 transition-all hover:scale-110"
+              aria-label="Website"
+            >
+              <Globe size={18} />
+            </a>
+          </div>
         </div>
-      </div>
-
-      <div className="mt-10 text-center text-gray-500 text-xs">
-        © {new Date().getFullYear()} VocalPoint. All rights reserved.
       </div>
     </footer>
   );
