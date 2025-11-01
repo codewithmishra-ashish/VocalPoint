@@ -1,8 +1,8 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
+import API from "../utils/api";
 
 const AuthContext = createContext();
-
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -12,33 +12,47 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      // Quick mock user load (simulate API call)
-      setTimeout(() => {
-        setUser({ name: "Aisha Khan", email: "aisha@example.com" });  // ← Mock user
-        setLoading(false);
-      }, 500);  // ← 0.5s delay for realism
+      API.get("/auth/me")
+        .then((res) => setUser(res.data))
+        .catch(() => localStorage.removeItem("token"))
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
   }, []);
 
-  const login = async (email, password) => {
-    const mockToken = "mock-jwt-" + Date.now();  // ← Unique token
-    localStorage.setItem("token", mockToken);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${mockToken}`;
-    setUser({ name: email.split("@")[0], email });
-    return { success: true };
+  const register = async (data) => {
+    const res = await API.post("/auth/register", data);
+    localStorage.setItem("token", res.data.token);
+    setUser(res.data.user);
+    return res.data;
+  };
+
+  const login = async (credentials) => {
+    const res = await API.post("/auth/login", credentials);
+    localStorage.setItem("token", res.data.token);
+    setUser(res.data.user);
+    return res.data;
+  };
+
+  // FIXED: correct URL + user._id
+  const completeProfile = async (profileData) => {
+    if (!user?._id) throw new Error("User not logged in");
+    const res = await API.put(`/auth/profile/${user._id}`, profileData);
+    setUser((prev) => ({
+      ...prev,
+      profile: { ...prev.profile, ...res.data.profile, isComplete: true },
+    }));
+    return res.data;
   };
 
   const logout = () => {
     localStorage.removeItem("token");
-    delete axios.defaults.headers.common["Authorization"];
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, register, login, completeProfile, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

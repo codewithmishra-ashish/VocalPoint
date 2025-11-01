@@ -1,9 +1,12 @@
+// src/components/HeroDual.jsx
 import React from "react";
-import { ArrowRight, Zap, Building2, Users } from "lucide-react"; // Removed Mic
+import { Mic, ArrowRight, Zap, Building2, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const HeroDual = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center px-6 overflow-hidden bg-gradient-to-br from-indigo-950 via-blue-950 to-gray-950">
+      {/* Animated Background Blobs */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <div className="absolute top-10 left-10 w-72 h-72 bg-blue-600 rounded-full mix-blend-multiply blur-3xl opacity-30 animate-blob"></div>
         <div className="absolute top-40 right-20 w-96 h-96 bg-indigo-600 rounded-full mix-blend-multiply blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
@@ -17,6 +20,7 @@ const HeroDual = () => {
           <span>AI-Powered Voice Data Marketplace</span>
         </div>
 
+        {/* Title */}
         <h1 className="text-5xl md:text-7xl font-extrabold leading-tight mb-6">
           <span className="block bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-lg">
             The Future of Voice Data
@@ -32,25 +36,26 @@ const HeroDual = () => {
 
         {/* Dual CTAs */}
         <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-          <a
-            href="/enterprise"
-            className="group inline-flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 px-8 rounded-full shadow-xl transform transition hover:scale-105"
-          >
-            <Building2 className="mr-2" size={20} />
-            For Companies
-            <ArrowRight className="ml-2 group-hover:translate-x-1 transition" />
-          </a>
-          <a
-            href="/login"
+          <Link
+            to="/register-worker"
             className="group inline-flex items-center bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 px-8 rounded-full shadow-xl transform transition hover:scale-105"
           >
             <Users className="mr-2" size={20} />
             Earn as a Contributor
             <ArrowRight className="ml-2 group-hover:translate-x-1 transition" />
-          </a>
+          </Link>
+
+          <Link
+            to="/register-company"
+            className="group inline-flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 px-8 rounded-full shadow-xl transform transition hover:scale-105"
+          >
+            <Building2 className="mr-2" size={20} />
+            For Companies
+            <ArrowRight className="ml-2 group-hover:translate-x-1 transition" />
+          </Link>
         </div>
 
-        {/* Trust */}
+        {/* Trust Stats */}
         <div className="mt-16 flex flex-wrap justify-center gap-8 text-sm text-gray-400">
           <div>Used by 50+ AI labs</div>
           <div>10K+ contributors</div>

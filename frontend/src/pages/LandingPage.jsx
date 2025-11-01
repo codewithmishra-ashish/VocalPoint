@@ -20,7 +20,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    if (!loading && user) navigate("/dashboard");
+    if (!loading && user) navigate("/dashboard-" + user.role);
   }, [user, loading, navigate]);
 
   if (loading) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-blue-400 animate-pulse">Loading...</div>;
